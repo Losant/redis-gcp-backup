@@ -17,6 +17,9 @@ Flags:
     Specify an alternate server name to be used in the bucket path construction. Used
     to create or retrieve backups from different servers
 
+  -A, --awsbucket
+   AWS bucket used in deployment and by the cluster.
+
   -b, --gcsbucket
    Google Cloud Storage bucket used in deployment and by the cluster.
 
@@ -133,6 +136,7 @@ function verbose_vars() {
   logverbose "DRY_RUN: ${DRY_RUN}"
   logverbose "GCS_BUCKET: ${GCS_BUCKET}"
   logverbose "GSUTIL: ${GSUTIL}"
+  logverbose "AWSCLI: ${AWSCLI}"
   logverbose "HOSTNAME: ${HOSTNAME}"
   logverbose "LOG_DIR: ${LOG_DIR}"
   logverbose "LOG_FILE: ${LOG_FILE}"
@@ -174,12 +178,25 @@ function inventory() {
 function backup() {
   create_gcs_backup_path
   copy_to_gcs
+  if [ ${AWS_BUCKET} ]; then
+    if [ -z ${AWSCLI} ]; then
+      logerror "Cannot find aws utility please make sure it is in the PATH"
+      exit 1
+    fi
+    create_aws_backup_path
+    copy_to_aws
+  fi
 }
 
 # Set the backup path bucket URL
 function create_gcs_backup_path() {
   GCS_BACKUP_PATH="${GCS_BUCKET}/backups/${HOSTNAME}/${SUFFIX}/${DATE}/"
   loginfo "Will use target backup directory: ${GCS_BACKUP_PATH}"
+}
+
+function create_aws_backup_path() {
+  GCS_BACKUP_PATH="${AWS_BUCKET}/backups/${HOSTNAME}/${SUFFIX}/${DATE}/"
+  loginfo "Will use target backup directory: ${AWS_BACKUP_PATH}"
 }
 
 # Copy the backup files up to the GCS bucket
@@ -189,6 +206,15 @@ function copy_to_gcs() {
     loginfo "DRY RUN: ${GSUTIL} cp ${RDB_DIR}/dump.rdb ${GCS_BACKUP_PATH}"
   else
     ${GSUTIL} cp "${RDB_DIR}/dump.rdb" "${GCS_BACKUP_PATH}"
+  fi
+}
+
+function copy_to_aws() {
+  loginfo "Copying files to ${AWS_BACKUP_PATH}"
+  if ${DRY_RUN}; then
+    loginfo "DRY RUN: ${AWSCLI} cp ${RDB_DIR}/dump.rdb ${AWS_BACKUP_PATH}"
+  else
+    ${AWSCLI} cp "${RDB_DIR}/dump.rdb" "${AWS_BACKUP_PATH}"
   fi
 }
 
@@ -208,6 +234,7 @@ for arg in "$@"; do
                     ;;
     "inventory") set -- "$@" "-I" ;;
     "--alt-hostname")   set -- "$@" "-a" ;;
+    "--awsbucket") set -- "$@" "-A" ;;
     "--gcsbucket") set -- "$@" "-b" ;;
     "--rdbdir")   set -- "$@" "-d" ;;
     "--help") set -- "$@" "-h" ;;
@@ -218,11 +245,14 @@ for arg in "$@"; do
   esac
 done
 
-while getopts 'a:b:BcCd:DfhH:iIjkl:LnN:p:rs:S:T:u:U:vwy:z' OPTION
+while getopts 'a:A:b:BcCd:DfhH:iIjkl:LnN:p:rs:S:T:u:U:vwy:z' OPTION
 do
   case $OPTION in
       a)
           HOSTNAME=${OPTARG}
+          ;;
+      A)
+          AWS_BUCKET=${OPTARG%/}
           ;;
       b)
           GCS_BUCKET=${OPTARG%/}
@@ -262,6 +292,7 @@ DATE="$(prepare_date +%F_%H-%M )" #nicely formatted date string for files
 DRY_RUN=${DRY_RUN:-false} #flag to only print what would have executed
 ERROR_COUNT=0 #used in validation step will exit if > 0
 GSUTIL="$(which gsutil)" #which gsutil script
+AWSCLI="$(which aws)" #which aws script
 HOSTNAME=${HOSTNAME:-"$(hostname)"} #used for gcs backup location
 LOG_DIR=${LOG_DIR:-/var/log/redis} #where to write the log files
 LOG_FILE="${LOG_DIR}/RedisBackup${DATE}.log" #script log file
