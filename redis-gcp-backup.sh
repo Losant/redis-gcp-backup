@@ -195,7 +195,7 @@ function create_gcs_backup_path() {
 }
 
 function create_aws_backup_path() {
-  GCS_BACKUP_PATH="${AWS_BUCKET}/backups/${HOSTNAME}/${SUFFIX}/${DATE}/"
+  AWS_BACKUP_PATH="${AWS_BUCKET}/backups/${HOSTNAME}/${SUFFIX}/${DATE}/"
   loginfo "Will use target backup directory: ${AWS_BACKUP_PATH}"
 }
 
