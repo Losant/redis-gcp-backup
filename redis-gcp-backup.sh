@@ -212,9 +212,9 @@ function copy_to_gcs() {
 function copy_to_aws() {
   loginfo "Copying files to ${AWS_BACKUP_PATH}"
   if ${DRY_RUN}; then
-    loginfo "DRY RUN: ${AWSCLI} cp ${RDB_DIR}/dump.rdb ${AWS_BACKUP_PATH}"
+    loginfo "DRY RUN: ${AWSCLI} s3 cp ${RDB_DIR}/dump.rdb ${AWS_BACKUP_PATH}"
   else
-    ${AWSCLI} cp "${RDB_DIR}/dump.rdb" "${AWS_BACKUP_PATH}"
+    ${AWSCLI} s3 cp "${RDB_DIR}/dump.rdb" "${AWS_BACKUP_PATH}"
   fi
 }
 
